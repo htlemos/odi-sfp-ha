@@ -1,6 +1,7 @@
 {
   "domain": "odi_sfp",
   "name": "ODI xPON SFP",
+  "config_flow": true,
   "documentation": "https://github.com/htlemos/odi-sfp-ha",
   "dependencies": [],
   "codeowners": ["@htlemos"],
