@@ -38,3 +38,41 @@ Based on the Realtek diagnostic shell (`RTK.0>`) commands found in various commu
 
 ---
 *Disclaimer: Use this integration at your own risk. Frequent polling of low-power SFP sticks can occasionally cause reboots on certain firmware versions.*
+
+---
+
+## 🎨 Custom Dashboard layout
+
+```yaml
+type: vertical-stack
+cards:
+  - type: gauge
+    entity: sensor.odi_sfp_192_168_1_1_rx_power
+    name: Fiber Signal (Rx)
+    min: -30
+    max: -5
+    severity:
+      green: -24
+      yellow: -27
+      red: -30
+    needle: true
+  - type: entities
+    title: ODI SFP Handshake
+    show_header_toggle: false
+    entities:
+      - entity: sensor.odi_sfp_192_168_1_1_onu_status
+        name: Link Status
+      - entity: sensor.odi_sfp_192_168_1_1_onu_state_phase
+        name: Handshake Phase
+      - entity: sensor.odi_sfp_192_168_1_1_onu_state_phase
+        name: Registration Detail
+        type: attribute
+        attribute: phase_description
+        icon: mdi:information-outline
+      - type: divider
+      - entity: sensor.odi_sfp_192_168_1_1_temperature
+        name: Stick Temp
+      - entity: sensor.odi_sfp_192_168_1_1_voltage
+        name: Internal Voltage
+      - entity: sensor.odi_sfp_192_168_1_1_tx_power
+        name: Transmit Power
