@@ -39,6 +39,15 @@ class ODISFPCoordinator(DataUpdateCoordinator):
                 look_for_keys=False
             )
 
+ # Define specific search patterns for each command's output
+            # This looks for the label and then captures the number following it
+            patterns = {
+                'rx_power': r"rx\s+power:\s+([-+]?\d*\.\d+|\d+)",
+                'tx_power': r"tx\s+power:\s+([-+]?\d*\.\d+|\d+)",
+                'temp': r"temperature:\s+([-+]?\d*\.\d+|\d+)",
+                'voltage': r"voltage:\s+([-+]?\d*\.\d+|\d+)"
+            }
+
             commands = {
                 'rx_power': "diag pon get transceiver rx-power",
                 'tx_power': "diag pon get transceiver tx-power",
@@ -48,12 +57,16 @@ class ODISFPCoordinator(DataUpdateCoordinator):
 
             for key, cmd in commands.items():
                 stdin, stdout, stderr = client.exec_command(cmd)
+                # We read everything and convert to lowercase for easier matching
                 raw_output = stdout.read().decode('utf-8', errors='ignore').lower()
-                # Find the number following 'voltage:', 'power:', etc.
-                match = re.findall(r"[-+]?\d*\.\d+|\d+", raw_output)
+                
+                # Use the specific pattern for this key
+                match = re.search(patterns[key], raw_output)
                 if match:
-                    # We take the last match in case the command echo contains numbers
-                    results[key] = float(match[-1])
+                    results[key] = float(match.group(1))
+                else:
+                    _LOGGER.warning(f"Could not parse {key} from output: {raw_output}")
+                    results[key] = 0.0
 
             # ONU State
             stdin, stdout, stderr = client.exec_command("diag gpon get onu-state")
