@@ -7,17 +7,17 @@ async def async_setup_entry(hass, entry, async_add_entities):
     coordinator = hass.data[DOMAIN][entry.entry_id]
     serial = coordinator.data.get('serial', entry.entry_id)
 
-    # Standard Sensors
     sensors = [
         ODISensor(coordinator, entry, "Rx Power", "rx_power", "dBm", SensorDeviceClass.SIGNAL_STRENGTH, serial, 2),
         ODISensor(coordinator, entry, "Tx Power", "tx_power", "dBm", SensorDeviceClass.SIGNAL_STRENGTH, serial, 2),
         ODISensor(coordinator, entry, "Temperature", "temp", "°C", SensorDeviceClass.TEMPERATURE, serial, 1),
         ODISensor(coordinator, entry, "Voltage", "voltage", "V", SensorDeviceClass.VOLTAGE, serial, 3),
+        # New Numeric State Sensor
+        ODISensor(coordinator, entry, "ONU State Phase", "onu_state_int", None, None, serial, 0),
     ]
     
-    # Binary Sensor for Connectivity
     binary_sensors = [
-        ODIBinarySensor(coordinator, entry, "ONU Status", "onu_state", BinarySensorDeviceClass.CONNECTIVITY, serial)
+        ODIBinarySensor(coordinator, entry, "ONU Status", "onu_state_bool", BinarySensorDeviceClass.CONNECTIVITY, serial)
     ]
     
     async_add_entities(sensors + binary_sensors)
@@ -43,6 +43,24 @@ class ODISensor(CoordinatorEntity, SensorEntity):
     @property
     def native_value(self):
         return self.coordinator.data.get(self._key)
+    
+    @property
+    def extra_state_attributes(self):
+        """Add friendly descriptions for the ONU states."""
+        # We only want to add these attributes to the numeric phase sensor
+        if self._key == "onu_state_int":
+            states = {
+                1: "Initial State (O1)",
+                2: "Standby State (O2)",
+                3: "Serial Number State (O3)",
+                4: "Ranging State (O4)",
+                5: "Operation State (O5)",
+                6: "Intermittent State (O6)",
+                7: "Emergency Stop (O7)"
+            }
+            val = self.coordinator.data.get(self._key)
+            return {"phase_description": states.get(val, "Unknown")}
+        return None
 
 class ODIBinarySensor(CoordinatorEntity, BinarySensorEntity):
     """Binary sensor for ONU State (O5)."""
@@ -58,5 +76,5 @@ class ODIBinarySensor(CoordinatorEntity, BinarySensorEntity):
 
     @property
     def is_on(self):
-        """Return true if the ONU is in O5 state."""
-        return self.coordinator.data.get(self._key, False)
+        """Return true if the ONU is authenticated (O5)."""
+        return self.coordinator.data.get("onu_state_bool", False)

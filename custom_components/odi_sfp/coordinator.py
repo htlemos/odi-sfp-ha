@@ -74,6 +74,17 @@ class ODISFPCoordinator(DataUpdateCoordinator):
             
             # ONU State check
             results['onu_state'] = "O5" in raw_output
+
+            # Search for the ONU state pattern (O followed by a digit)
+            # Typical output: "ONU State: O5"
+            state_match = re.search(r"O([1-7])", raw_output)
+            if state_match:
+                state_val = int(state_match.group(1))
+                results['onu_state_int'] = state_val
+                results['onu_state_bool'] = (state_val == 5)
+            else:
+                results['onu_state_int'] = 0
+                results['onu_state_bool'] = False
             
             # Identifiers
             results['serial'] = "PTINA86AD4CF"
