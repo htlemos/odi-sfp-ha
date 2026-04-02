@@ -1,0 +1,10 @@
+{
+  "domain": "odi_sfp",
+  "name": "ODI xPON SFP",
+  "documentation": "https://github.com/htlemos/odi-sfp-ha",
+  "dependencies": [],
+  "codeowners": ["@htlemos"],
+  "requirements": ["paramiko==3.4.0"],
+  "version": "1.0.0",
+  "iot_class": "local_polling"
+}

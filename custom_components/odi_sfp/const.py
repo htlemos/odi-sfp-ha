@@ -1,0 +1,4 @@
+DOMAIN = "odi_sfp"
+DEFAULT_NAME = "ODI xPON SFP"
+DEFAULT_USER = "admin"
+DEFAULT_PASS = "admin"

@@ -1,0 +1,5 @@
+{
+  "name": "ODI DFP-34X-2C2/3 Integration HA",
+  "render_readme": true,
+  "homeassistant": "2024.1.0"
+}
