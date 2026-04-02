@@ -24,6 +24,12 @@ class ODISFPCoordinator(DataUpdateCoordinator):
         return await self.hass.async_add_executor_job(self.fetch_sfp_data)
 
     def fetch_sfp_data(self):
+        """Fetch all data in a single SSH session to reduce CPU load on the stick."""
+        import warnings
+        import paramiko
+        import re
+        from cryptography.utils import CryptographyDeprecationWarning
+        
         warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -39,46 +45,44 @@ class ODISFPCoordinator(DataUpdateCoordinator):
                 look_for_keys=False
             )
 
- # Define specific search patterns for each command's output
-            # This looks for the label and then captures the number following it
-            patterns = {
-                'rx_power': r"rx\s+power:\s+([-+]?\d*\.\d+|\d+)",
-                'tx_power': r"tx\s+power:\s+([-+]?\d*\.\d+|\d+)",
-                'temp': r"temperature:\s+([-+]?\d*\.\d+|\d+)",
-                'voltage': r"voltage:\s+([-+]?\d*\.\d+|\d+)"
-            }
+            # Combine all commands into one string separated by semicolons
+            # This is much faster and more stable for the SFP stick
+            all_cmds = (
+                "diag pon get transceiver rx-power; "
+                "diag pon get transceiver tx-power; "
+                "diag pon get transceiver temperature; "
+                "diag pon get transceiver voltage; "
+                "diag gpon get onu-state"
+            )
 
-            commands = {
-                'rx_power': "diag pon get transceiver rx-power",
-                'tx_power': "diag pon get transceiver tx-power",
-                'temp': "diag pon get transceiver temperature",
-                'voltage': "diag pon get transceiver voltage"
-            }
+            stdin, stdout, stderr = client.exec_command(all_cmds)
+            # Read the entire output at once
+            raw_output = stdout.read().decode('utf-8', errors='ignore')
+            _LOGGER.debug(f"ODI Raw Output: {raw_output}")
 
-            for key, cmd in commands.items():
-                stdin, stdout, stderr = client.exec_command(cmd)
-                # We read everything and convert to lowercase for easier matching
-                raw_output = stdout.read().decode('utf-8', errors='ignore').lower()
-                
-                # Use the specific pattern for this key
-                match = re.search(patterns[key], raw_output)
-                if match:
-                    results[key] = float(match.group(1))
-                else:
-                    _LOGGER.warning(f"Could not parse {key} from output: {raw_output}")
-                    results[key] = 0.0
+            # Strict Regex Parsing
+            # We look for the Label (case insensitive) and the number immediately following
+            def extract(label, text):
+                # Matches "Rx Power: -21.73" or "Temperature: 45.7"
+                match = re.search(rf"{label}[:\s]+([-+]?\d*\.\d+|\d+)", text, re.IGNORECASE)
+                return float(match.group(1)) if match else 0.0
 
-            # ONU State
-            stdin, stdout, stderr = client.exec_command("diag gpon get onu-state")
-            state_output = stdout.read().decode('utf-8', errors='ignore')
-            results['onu_state'] = "O5" in state_output
+            results['rx_power'] = extract("Rx Power", raw_output)
+            results['tx_power'] = extract("Tx Power", raw_output)
+            results['temp'] = extract("Temperature", raw_output)
+            results['voltage'] = extract("Voltage", raw_output)
             
-            # Static identifiers from your hardware
+            # ONU State check
+            results['onu_state'] = "O5" in raw_output
+            
+            # Identifiers
             results['serial'] = "PTINA86AD4CF"
             results['model'] = "DFP-34X-2C2/3"
 
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with SFP: {err}")
+            _LOGGER.error(f"SSH Error polling ODI SFP: {err}")
+            raise UpdateFailed(err)
         finally:
             client.close()
+            
         return results
