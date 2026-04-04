@@ -73,14 +73,21 @@ class ODISFPCoordinator(DataUpdateCoordinator):
             results['onu_state_bool'] = (results['onu_state_int'] == 5)
 
             # --- System Stats ---
-            # Search for the first float in the line (e.g., 339289.09)
-            uptime_match = re.search(r"^(\d+\.\d+)", raw_output)
+            # We look for two floats separated by a space on their own line
+            # Example: 339289.09 335181.35
+            uptime_match = re.search(r"(\d+\.\d+)\s+\d+\.\d+", raw_output)
             if uptime_match:
                 total_seconds = float(uptime_match.group(1))
-                # Store as raw hours: 339289 / 3600 = 94.2
+                # Convert to hours: 339289 / 3600 = 94.2
                 results['uptime'] = round(total_seconds / 3600, 1)
             else:
-                results['uptime'] = 0.0
+                # Fallback: just find the first number that looks like a large uptime
+                # specifically avoiding the small numbers like '3.24' from voltage
+                uptime_fallback = re.findall(r"(\d{5,}\.\d+)", raw_output)
+                if uptime_fallback:
+                    results['uptime'] = round(float(uptime_fallback[-1]) / 3600, 1)
+                else:
+                    results['uptime'] = 0.0
 
             mem_val = extract(r"MemFree[:\s]+(\d+)", raw_output)
             results['mem_free'] = round(int(mem_val) / 1024, 2) if mem_val else 0
