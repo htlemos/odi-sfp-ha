@@ -28,11 +28,20 @@ A custom integration for Home Assistant to monitor optical statistics, connectio
 
 ## 🛠 Installation
 
-### Manual Installation
+### Option 1: HACS (Recommended)
+1. Ensure [HACS](https://hacs.xyz/) is installed.
+2. Go to **HACS** > **Integrations**.
+3. Click the three dots in the top right corner and select **Custom repositories**.
+4. Paste the URL of this repository into the **Repository** field.
+5. Select **Integration** as the category and click **Add**.
+6. Find the **ODI xPON SFP** integration in HACS and click **Download**.
+7. **Restart** Home Assistant.
+8. Go to **Settings** > **Devices & Services** > **Add Integration** and search for **ODI xPON SFP**.
+
+### Option 2: Manual Installation
 1. Copy the `odi_sfp` folder to your `custom_components` directory.
 2. Restart Home Assistant.
-3. Go to **Settings > Devices & Services > Add Integration**.
-4. Search for **ODI xPON SFP** and enter your SFP stick's IP, username, password, and desired polling interval (default 60s).
+3. Go to **Settings** > **Devices & Services** > **Add Integration** and search for **ODI xPON SFP**.
 
 ## ⚠️ Requirements
 - SFP Stick with SSH enabled (usually port 22).
