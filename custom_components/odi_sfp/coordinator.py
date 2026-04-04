@@ -74,7 +74,7 @@ class ODISFPCoordinator(DataUpdateCoordinator):
 
             # --- System Stats ---
             uptime_val = extract(r"^(\d+\.\d+)", raw_output)
-            results['uptime'] = round(float(uptime_val) / 3600, 2) if uptime_val else 0
+            results['uptime'] = float(uptime_val) if uptime_val else 0.0 # Return raw seconds else 0
             
             mem_val = extract(r"MemFree[:\s]+(\d+)", raw_output)
             results['mem_free'] = round(int(mem_val) / 1024, 2) if mem_val else 0
