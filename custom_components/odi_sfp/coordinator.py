@@ -14,9 +14,13 @@ class ODISFPCoordinator(DataUpdateCoordinator):
         self.username = entry.data["username"]
         self.password = entry.data["password"]
         
-        # Pull the interval from config, default to 60 if missing
+        # CPU tracking variables for delta calculation
+        self._last_total_ticks = None
+        self._last_idle_ticks = None
+
+        # Interval comes from user configuration
         scan_interval = entry.data.get("update_interval", 60)
-        
+
         super().__init__(
             hass,
             _LOGGER,
@@ -28,76 +32,80 @@ class ODISFPCoordinator(DataUpdateCoordinator):
         return await self.hass.async_add_executor_job(self.fetch_sfp_data)
 
     def fetch_sfp_data(self):
-        """Fetch all data in a single SSH session to reduce CPU load on the stick."""
-        import warnings
-        import paramiko
-        import re
-        from cryptography.utils import CryptographyDeprecationWarning
-        
         warnings.filterwarnings("ignore", category=CryptographyDeprecationWarning)
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
         results = {}
         try:
-            client.connect(
-                self.host, 
-                username=self.username, 
-                password=self.password, 
-                timeout=15,
-                allow_agent=False,
-                look_for_keys=False
-            )
+            client.connect(self.host, username=self.username, password=self.password, timeout=15)
 
-            # Combine all commands into one string separated by semicolons
-            # This is much faster and more stable for the SFP stick
+            # Combined batch command for efficiency
             all_cmds = (
                 "diag pon get transceiver rx-power; "
                 "diag pon get transceiver tx-power; "
+                "diag pon get transceiver bias-current; "
                 "diag pon get transceiver temperature; "
                 "diag pon get transceiver voltage; "
-                "diag gpon get onu-state"
+                "diag gpon get onu-state; "
+                "cat /proc/uptime; "
+                "cat /proc/meminfo; "
+                "cat /proc/stat"
             )
 
             stdin, stdout, stderr = client.exec_command(all_cmds)
-            # Read the entire output at once
             raw_output = stdout.read().decode('utf-8', errors='ignore')
-            _LOGGER.debug(f"ODI Raw Output: {raw_output}")
 
-            # Strict Regex Parsing
-            # We look for the Label (case insensitive) and the number immediately following
-            def extract(label, text):
-                # Matches "Rx Power: -21.73" or "Temperature: 45.7"
-                match = re.search(rf"{label}[:\s]+([-+]?\d*\.\d+|\d+)", text, re.IGNORECASE)
-                return float(match.group(1)) if match else 0.0
+            def extract(pattern, text, index=1):
+                match = re.search(pattern, text, re.IGNORECASE)
+                return match.group(index) if match else None
 
-            results['rx_power'] = extract("Rx Power", raw_output)
-            results['tx_power'] = extract("Tx Power", raw_output)
-            results['temp'] = extract("Temperature", raw_output)
-            results['voltage'] = extract("Voltage", raw_output)
+            # --- Optical & Health ---
+            results['rx_power'] = float(extract(r"Rx Power[:\s]+([-+]?\d*\.\d+|\d+)", raw_output) or 0)
+            results['tx_power'] = float(extract(r"Tx Power[:\s]+([-+]?\d*\.\d+|\d+)", raw_output) or 0)
+            results['bias_current'] = float(extract(r"Bias Current[:\s]+([-+]?\d*\.\d+|\d+)", raw_output) or 0)
+            results['temp'] = float(extract(r"Temperature[:\s]+([-+]?\d*\.\d+|\d+)", raw_output) or 0)
+            results['voltage'] = float(extract(r"Voltage[:\s]+([-+]?\d*\.\d+|\d+)", raw_output) or 0)
             
-            # ONU State check
-            results['onu_state'] = "O5" in raw_output
+            # --- ONU State ---
+            state_val = extract(r"O([1-7])", raw_output)
+            results['onu_state_int'] = int(state_val) if state_val else 0
+            results['onu_state_bool'] = (results['onu_state_int'] == 5)
 
-            # Search for the ONU state pattern (O followed by a digit)
-            # Typical output: "ONU State: O5"
-            state_match = re.search(r"O([1-7])", raw_output)
-            if state_match:
-                state_val = int(state_match.group(1))
-                results['onu_state_int'] = state_val
-                results['onu_state_bool'] = (state_val == 5)
-            else:
-                results['onu_state_int'] = 0
-                results['onu_state_bool'] = False
+            # --- System Stats ---
+            uptime_val = extract(r"^(\d+\.\d+)", raw_output)
+            results['uptime'] = round(float(uptime_val) / 3600, 2) if uptime_val else 0
             
+            mem_val = extract(r"MemFree[:\s]+(\d+)", raw_output)
+            results['mem_free'] = round(int(mem_val) / 1024, 2) if mem_val else 0
+
+            # --- CPU Calculation (Deltas) ---
+            cpu_match = re.search(r"cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)", raw_output)
+            if cpu_match:
+                ticks = [int(x) for x in cpu_match.groups()]
+                total_ticks = sum(ticks)
+                idle_ticks = ticks[3]
+
+                if self._last_total_ticks is not None:
+                    diff_total = total_ticks - self._last_total_ticks
+                    diff_idle = idle_ticks - self._last_idle_ticks
+                    if diff_total > 0:
+                        usage = 100 * (1 - (diff_idle / diff_total))
+                        results['cpu_usage'] = round(max(0, min(100, usage)), 1)
+                    else:
+                        results['cpu_usage'] = 0.0
+                else:
+                    results['cpu_usage'] = 0.0
+
+                self._last_total_ticks = total_ticks
+                self._last_idle_ticks = idle_ticks
+
             # Identifiers
             results['serial'] = "PTINA86AD4CF"
             results['model'] = "DFP-34X-2C2/3"
 
         except Exception as err:
-            _LOGGER.error(f"SSH Error polling ODI SFP: {err}")
-            raise UpdateFailed(err)
+            raise UpdateFailed(f"SSH Communication Error: {err}")
         finally:
             client.close()
-            
         return results
