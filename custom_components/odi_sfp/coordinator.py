@@ -73,9 +73,15 @@ class ODISFPCoordinator(DataUpdateCoordinator):
             results['onu_state_bool'] = (results['onu_state_int'] == 5)
 
             # --- System Stats ---
-            uptime_val = extract(r"^(\d+\.\d+)", raw_output)
-            results['uptime'] = float(uptime_val) if uptime_val else 0.0 # Return raw seconds else 0
-            
+            uptime_output = extract(r"^(\d+\.\d+\s+\d+\.\d+)", raw_output)
+            if uptime_output:
+                # Split "339289.09 335181.35" and take the first number
+                total_seconds = float(uptime_output.split()[0])
+                # Convert to hours (339289 / 3600 = 94.24)
+                results['uptime'] = round(total_seconds / 3600, 1)
+            else:
+                results['uptime'] = 0.0
+
             mem_val = extract(r"MemFree[:\s]+(\d+)", raw_output)
             results['mem_free'] = round(int(mem_val) / 1024, 2) if mem_val else 0
 

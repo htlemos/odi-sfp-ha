@@ -14,7 +14,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         ODISensor(coordinator, entry, "Temperature", "temp", "°C", SensorDeviceClass.TEMPERATURE, serial, 1),
         ODISensor(coordinator, entry, "Voltage", "voltage", "V", SensorDeviceClass.VOLTAGE, serial, 3),
         ODISensor(coordinator, entry, "ONU State Phase", "onu_state_int", None, None, serial, 0),
-        ODISensor(coordinator, entry, "Uptime", "uptime", "s", SensorDeviceClass.DURATION, serial, 0),        ODISensor(coordinator, entry, "Memory Free", "mem_free", "MB", None, serial, 2),
+        ODISensor(coordinator, entry, "Uptime", "uptime", "h", None, serial, 1),
         ODISensor(coordinator, entry, "CPU Usage", "cpu_usage", "%", None, serial, 1),
     ]
     
