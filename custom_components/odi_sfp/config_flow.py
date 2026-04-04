@@ -2,6 +2,9 @@ import voluptuous as vol
 from homeassistant import config_entries
 from .const import DOMAIN
 
+# Set a sensible default (e.g., 60 seconds)
+DEFAULT_INTERVAL = 60
+
 class ODISFPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
@@ -15,6 +18,9 @@ class ODISFPConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 vol.Required("host", default="192.168.1.1"): str,
                 vol.Required("username", default="admin"): str,
                 vol.Required("password", default="admin"): str,
+                vol.Required("update_interval", default=DEFAULT_INTERVAL): vol.All(
+                    vol.Coerce(int), vol.Range(min=10, max=3600)
+                ),
             }),
         )
 
@@ -28,6 +34,7 @@ class ODIOptionsFlowHandler(config_entries.OptionsFlow):
             self.hass.config_entries.async_update_entry(
                 self.config_entry, data={**self.config_entry.data, **user_input}
             )
+            # This triggers a reload of the integration to apply the new interval
             return self.async_create_entry(title="", data={})
 
         return self.async_show_form(
@@ -36,5 +43,9 @@ class ODIOptionsFlowHandler(config_entries.OptionsFlow):
                 vol.Required("host", default=self.config_entry.data.get("host")): str,
                 vol.Required("username", default=self.config_entry.data.get("username")): str,
                 vol.Required("password", default=self.config_entry.data.get("password")): str,
+                vol.Required(
+                    "update_interval", 
+                    default=self.config_entry.data.get("update_interval", DEFAULT_INTERVAL)
+                ): vol.All(vol.Coerce(int), vol.Range(min=10, max=3600)),
             }),
         )

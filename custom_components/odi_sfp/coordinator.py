@@ -9,15 +9,19 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 _LOGGER = logging.getLogger(__name__)
 
 class ODISFPCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, host, username, password):
-        self.host = host
-        self.username = username
-        self.password = password
+    def __init__(self, hass, entry):
+        self.host = entry.data["host"]
+        self.username = entry.data["username"]
+        self.password = entry.data["password"]
+        
+        # Pull the interval from config, default to 60 if missing
+        scan_interval = entry.data.get("update_interval", 60)
+        
         super().__init__(
             hass,
             _LOGGER,
-            name=f"ODI SFP {host}",
-            update_interval=timedelta(seconds=60),
+            name=f"ODI SFP {self.host}",
+            update_interval=timedelta(seconds=scan_interval),
         )
 
     async def _async_update_data(self):
