@@ -48,9 +48,15 @@ A custom integration for Home Assistant to monitor optical statistics, connectio
 - Default credentials are often `admin` / `admin`.
 - **Note:** Polling faster than 30 seconds is not recommended due to the high CPU overhead of SSH encryption on the Realtek chip.
 
-## 🎨 Custom Dashboard Layout
+## 🤝 Credits
+Based on the Realtek diagnostic shell (`RTK.0>`) research from the **Anime4000/RTL960x** community.
 
-This layout provides a professional "NOC" style view with side-by-side gauges for Signal and CPU health.
+---
+*Disclaimer: Use this integration at your own risk. Frequent polling of low-power SFP sticks can occasionally cause reboots on certain firmware versions.*
+
+---
+
+## 🎨 Custom Dashboard Layout
 
 ```yaml
 type: vertical-stack
