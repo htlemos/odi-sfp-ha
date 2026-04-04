@@ -73,26 +73,18 @@ class ODISFPCoordinator(DataUpdateCoordinator):
             results['onu_state_bool'] = (results['onu_state_int'] == 5)
 
             # --- System Stats ---
-            # We look for two floats separated by a space on their own line
-            # Example: 339289.09 335181.35
-            uptime_match = re.search(r"(\d+\.\d+)\s+\d+\.\d+", raw_output)
+            # Uptime: Look for the specific 'float float' pattern of /proc/uptime
+            uptime_match = re.search(r"(\d{5,}\.\d+)\s+\d+\.\d+", raw_output)
             if uptime_match:
-                total_seconds = float(uptime_match.group(1))
-                # Convert to hours: 339289 / 3600 = 94.2
-                results['uptime'] = round(total_seconds / 3600, 1)
+                results['uptime'] = round(float(uptime_match.group(1)) / 3600, 1)
             else:
-                # Fallback: just find the first number that looks like a large uptime
-                # specifically avoiding the small numbers like '3.24' from voltage
-                uptime_fallback = re.findall(r"(\d{5,}\.\d+)", raw_output)
-                if uptime_fallback:
-                    results['uptime'] = round(float(uptime_fallback[-1]) / 3600, 1)
-                else:
-                    results['uptime'] = 0.0
+                results['uptime'] = 0.0
 
-            mem_val = extract(r"MemFree[:\s]+(\d+)", raw_output)
-            results['mem_free'] = round(int(mem_val) / 1024, 2) if mem_val else 0
+            # Memory: MB from kB
+            mem_match = re.search(r"MemFree[:\s]+(\d+)", raw_output)
+            results['mem_free'] = round(int(mem_match.group(1)) / 1024, 2) if mem_match else 0.0
 
-            # --- CPU Calculation (Deltas) ---
+            # CPU Usage: Delta calculation
             cpu_match = re.search(r"cpu\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)", raw_output)
             if cpu_match:
                 ticks = [int(x) for x in cpu_match.groups()]
@@ -105,10 +97,9 @@ class ODISFPCoordinator(DataUpdateCoordinator):
                     if diff_total > 0:
                         usage = 100 * (1 - (diff_idle / diff_total))
                         results['cpu_usage'] = round(max(0, min(100, usage)), 1)
-                    else:
-                        results['cpu_usage'] = 0.0
-                else:
-                    results['cpu_usage'] = 0.0
+                
+                self._last_total_ticks = total_ticks
+                self._last_idle_ticks = idle_ticks
 
                 self._last_total_ticks = total_ticks
                 self._last_idle_ticks = idle_ticks
