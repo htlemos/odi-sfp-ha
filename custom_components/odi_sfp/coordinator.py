@@ -58,6 +58,9 @@ class ODISFPCoordinator(DataUpdateCoordinator):
             stdin, stdout, stderr = client.exec_command(all_cmds)
             raw_output = stdout.read().decode('utf-8', errors='ignore')
 
+            # Temporary debug line - check your HA Logs
+            _LOGGER.debug("SFP Raw Output: %s", raw_output)    
+
             def extract(pattern, text, index=1):
                 match = re.search(pattern, text, re.IGNORECASE)
                 return match.group(index) if match else None
@@ -106,12 +109,12 @@ class ODISFPCoordinator(DataUpdateCoordinator):
                 self._last_total_ticks = total_ticks
                 self._last_idle_ticks = idle_ticks
 
-            # Fiber FCS Errors (from ds-eth block)
-            fcs_match = re.search(r"FCS Error\s+:\s+(\d+)", raw_output)
+            # Fiber FCS Errors - Looser regex to handle any spacing
+            fcs_match = re.search(r"FCS Error\s*:\s*(\d+)", raw_output)
             results['fcs_errors'] = int(fcs_match.group(1)) if fcs_match else 0
 
-            # Fiber HEC Corrected (from ds-gem block)
-            hec_match = re.search(r"D/S HEC correct\s+:\s+(\d+)", raw_output)
+            # Fiber HEC Corrected - Looser regex
+            hec_match = re.search(r"D/S HEC correct\s*:\s*(\d+)", raw_output)
             results['hec_corrected'] = int(hec_match.group(1)) if hec_match else 0
 
             # Identifiers
