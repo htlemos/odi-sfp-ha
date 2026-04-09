@@ -17,6 +17,8 @@ async def async_setup_entry(hass, entry, async_add_entities):
         ODISensor(coordinator, entry, "Uptime", "uptime", "h", None, serial, 1),    
         ODISensor(coordinator, entry, "Memory Free", "mem_free", "MB", None, serial, 2),
         ODISensor(coordinator, entry, "CPU Usage", "cpu_usage", "%", None, serial, 1),
+        ODISensor(coordinator, entry, "Fiber FCS Errors", "fcs_errors", "errors", None, serial, 0),
+        ODISensor(coordinator, entry, "Fiber HEC Corrected", "hec_corrected", "errors", None, serial, 0),
     ]
     
     binary_sensors = [

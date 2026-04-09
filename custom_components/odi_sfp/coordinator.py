@@ -50,7 +50,9 @@ class ODISFPCoordinator(DataUpdateCoordinator):
                 "diag gpon get onu-state; "
                 "cat /proc/uptime; "
                 "cat /proc/meminfo; "
-                "cat /proc/stat"
+                "cat /proc/stat; "
+                "diag gpon show counter global ds-eth; " # New
+                "diag gpon show counter global ds-gem"   # New
             )
 
             stdin, stdout, stderr = client.exec_command(all_cmds)
@@ -103,6 +105,14 @@ class ODISFPCoordinator(DataUpdateCoordinator):
 
                 self._last_total_ticks = total_ticks
                 self._last_idle_ticks = idle_ticks
+
+            # Fiber FCS Errors (from ds-eth block)
+            fcs_match = re.search(r"FCS Error\s+:\s+(\d+)", raw_output)
+            results['fcs_errors'] = int(fcs_match.group(1)) if fcs_match else 0
+
+            # Fiber HEC Corrected (from ds-gem block)
+            hec_match = re.search(r"D/S HEC correct\s+:\s+(\d+)", raw_output)
+            results['hec_corrected'] = int(hec_match.group(1)) if hec_match else 0
 
             # Identifiers
             results['serial'] = "PTINA86AD4CF"
